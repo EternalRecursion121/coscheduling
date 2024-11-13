@@ -115,7 +115,7 @@
         particleCount: 2,
         angle: 120,
         spread: 55,
-        origin: { x: 1 },
+        origin: { x : 1 },
         colors: colors
       });
 
@@ -202,6 +202,18 @@
             >
               Import Progress
             </button>
+          </div>
+        </div>
+
+        <div class="mb-6">
+          <div class="relative w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              class="absolute top-0 left-0 h-full bg-[#002147] transition-all duration-500 ease-out rounded-full"
+              style="width: {progressPercentage}%"
+            />
+          </div>
+          <div class="mt-2 text-right text-sm text-gray-500">
+            {progressPercentage.toFixed(1)}%
           </div>
         </div>
 
