@@ -12,6 +12,52 @@
   let searchQuery = '';
   let plusPressed = false;
 
+  // More efficient emoji encoding using single emojis and base conversion
+  function numberToEmoji(num) {
+    // Using a range of emojis from 128512 to 128591 (80 emojis)
+    return String.fromCodePoint(128512 + (num % 80));
+  }
+
+  function emojiToNumber(emoji) {
+    return emoji.codePointAt(0) - 128512;
+  }
+
+  function encodeVisited() {
+    let visited = [...visitedLibraries].map(lib => 
+      oxfordLibraries.indexOf(lib)
+    ).sort((a, b) => a - b);
+    
+    // Convert to base-80 using emojis
+    let chunks = [];
+    let value = 0;
+    for (let i = 0; i < visited.length; i++) {
+      value = value * 100 + visited[i];
+      if ((i + 1) % 2 === 0 || i === visited.length - 1) {
+        chunks.push(numberToEmoji(value));
+        value = 0;
+      }
+    }
+    return chunks.join('');
+  }
+
+  function decodeVisited(str) {
+    try {
+      let numbers = [];
+      for (let emoji of str) {
+        let value = emojiToNumber(emoji);
+        if (value < 0 || value >= 80) continue;
+        
+        let n1 = Math.floor(value / 100);
+        let n2 = value % 100;
+        if (n1 < oxfordLibraries.length) numbers.push(n1);
+        if (n2 < oxfordLibraries.length) numbers.push(n2);
+      }
+      return new Set(numbers.map(i => oxfordLibraries[i]));
+    } catch {
+      return new Set();
+    }
+  }
+
   onMount(() => {
     const saved = localStorage.getItem('visitedLibraries');
     if (saved) {
@@ -96,8 +142,9 @@
   }
 
   function handleExport() {
-    exportString = btoa(JSON.stringify([...visitedLibraries]));
-    navigator.clipboard.writeText(exportString);
+    const emojiString = encodeVisited();
+    navigator.clipboard.writeText(emojiString);
+    exportString = emojiString;
     showExportMessage = true;
     setTimeout(() => {
       showExportMessage = false;
@@ -111,8 +158,7 @@
 
   function importProgress() {
     try {
-      const decoded = JSON.parse(atob(importString));
-      visitedLibraries = new Set(decoded);
+      visitedLibraries = decodeVisited(importString);
       localStorage.setItem('visitedLibraries', JSON.stringify([...visitedLibraries]));
       importString = '';
       showImport = false;
@@ -191,8 +237,8 @@
 
         {#if showExportMessage && exportString}
           <div class="mb-4 p-4 bg-white border border-gray-200 rounded">
-            <p class="text-sm text-gray-600 mb-2">Your progress string:</p>
-            <p class="text-xs font-mono bg-gray-50 p-2 rounded break-all">{exportString}</p>
+            <p class="text-sm text-gray-600 mb-2">Your progress string (copied to clipboard):</p>
+            <p class="text-2xl bg-gray-50 p-2 rounded break-all">{exportString}</p>
           </div>
         {/if}
 
