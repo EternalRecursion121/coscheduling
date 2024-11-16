@@ -12,48 +12,61 @@
   let searchQuery = '';
   let plusPressed = false;
 
-  // More efficient emoji encoding using single emojis and base conversion
-  function numberToEmoji(num) {
-    // Using a range of emojis from 128512 to 128591 (80 emojis)
-    return String.fromCodePoint(128512 + (num % 80));
+  // Define 64 unique emojis
+  const emojiChars = [];
+  for (let i = 0; i < 64; i++) {
+    emojiChars.push(String.fromCodePoint(0x1F600 + i));
   }
 
-  function emojiToNumber(emoji) {
-    return emoji.codePointAt(0) - 128512;
+  const emojiToIndex = {};
+  for (let i = 0; i < emojiChars.length; i++) {
+    const emoji = emojiChars[i];
+    emojiToIndex[emoji] = i;
   }
 
   function encodeVisited() {
-    let visited = [...visitedLibraries].map(lib => 
-      oxfordLibraries.indexOf(lib)
-    ).sort((a, b) => a - b);
-    
-    // Convert to base-80 using emojis
-    let chunks = [];
-    let value = 0;
-    for (let i = 0; i < visited.length; i++) {
-      value = value * 100 + visited[i];
-      if ((i + 1) % 2 === 0 || i === visited.length - 1) {
-        chunks.push(numberToEmoji(value));
-        value = 0;
-      }
+    // Build the binary string
+    let binaryString = '';
+    for (let i = 0; i < oxfordLibraries.length; i++) {
+      binaryString += visitedLibraries.has(oxfordLibraries[i]) ? '1' : '0';
     }
-    return chunks.join('');
+    // Pad to make length a multiple of 6
+    while (binaryString.length % 6 !== 0) {
+      binaryString += '0';
+    }
+    // Convert each 6-bit chunk to an emoji
+    let emojiString = '';
+    for (let i = 0; i < binaryString.length; i += 6) {
+      let bits = binaryString.substr(i, 6);
+      let num = parseInt(bits, 2);
+      let emoji = emojiChars[num];
+      emojiString += emoji;
+    }
+    return emojiString;
   }
 
   function decodeVisited(str) {
     try {
-      let numbers = [];
-      for (let emoji of str) {
-        let value = emojiToNumber(emoji);
-        if (value < 0 || value >= 80) continue;
-        
-        let n1 = Math.floor(value / 100);
-        let n2 = value % 100;
-        if (n1 < oxfordLibraries.length) numbers.push(n1);
-        if (n2 < oxfordLibraries.length) numbers.push(n2);
+      let binaryString = '';
+      for (let emoji of Array.from(str)) {
+        let num = emojiToIndex[emoji];
+        if (num === undefined) {
+          throw new Error('Invalid character in import string');
+        }
+        let bits = num.toString(2).padStart(6, '0');
+        binaryString += bits;
       }
-      return new Set(numbers.map(i => oxfordLibraries[i]));
-    } catch {
+      // Trim any padding bits added during encoding
+      binaryString = binaryString.substr(0, 101);
+      let newVisitedLibraries = new Set();
+      for (let i = 0; i < binaryString.length; i++) {
+        if (binaryString[i] === '1') {
+          newVisitedLibraries.add(oxfordLibraries[i]);
+        }
+      }
+      return newVisitedLibraries;
+    } catch (error) {
+      alert('Invalid import string');
       return new Set();
     }
   }
@@ -89,10 +102,8 @@
   }
 
   function selectAllLibraries() {
-    const allButFirst = oxfordLibraries.slice(1);
-    visitedLibraries = new Set(allButFirst);
+    visitedLibraries = new Set(oxfordLibraries);
     localStorage.setItem('visitedLibraries', JSON.stringify([...visitedLibraries]));
-    
     previousProgress = visitedLibraries.size;
   }
 
@@ -115,7 +126,7 @@
         particleCount: 2,
         angle: 120,
         spread: 55,
-        origin: { x : 1 },
+        origin: { x: 1 },
         colors: colors
       });
 
@@ -131,7 +142,6 @@
     } else {
       visitedLibraries.add(library);
     }
-    visitedLibraries = visitedLibraries;
     localStorage.setItem('visitedLibraries', JSON.stringify([...visitedLibraries]));
 
     // Check if we just reached 100%
@@ -139,6 +149,7 @@
       celebrate();
     }
     previousProgress = visitedLibraries.size;
+    visitedLibraries = visitedLibraries;
   }
 
   function handleExport() {
@@ -157,18 +168,14 @@
   }
 
   function importProgress() {
-    try {
-      visitedLibraries = decodeVisited(importString);
-      localStorage.setItem('visitedLibraries', JSON.stringify([...visitedLibraries]));
-      importString = '';
-      showImport = false;
-    } catch (error) {
-      alert('Invalid import string');
-    }
+    visitedLibraries = decodeVisited(importString);
+    localStorage.setItem('visitedLibraries', JSON.stringify([...visitedLibraries]));
+    importString = '';
+    showImport = false;
   }
 
   $: progressPercentage = (visitedLibraries.size / oxfordLibraries.length) * 100;
-  $: filteredLibraries = oxfordLibraries.filter(library => 
+  $: filteredLibraries = oxfordLibraries.filter(library =>
     library.toLowerCase().includes(searchQuery.toLowerCase())
   );
 </script>
